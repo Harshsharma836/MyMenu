@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(base64, 'base64');
 
-    // upload using storage helper (S3 or local)
+    // upload using storage helper (Cloudinary or local)
     try {
       const res = await uploadBuffer(safeName, buffer, contentType);
       return NextResponse.json({ url: res.url });
