@@ -102,7 +102,8 @@ export default function DigitalMenuPage() {
   const categoryDishes = currentCategory?.dishes || [];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex flex-col min-h-screen bg-white">
+      <div className="flex-1">
       {/* Header */}
       <div className="bg-gradient-to-r from-secondary to-gray-800 text-white sticky top-0 z-40 shadow-lg">
         <div className="max-w-2xl mx-auto px-4 py-6">
@@ -232,6 +233,7 @@ export default function DigitalMenuPage() {
             {index + 1}
           </button>
         ))}
+      </div>
       </div>
     </div>
   );
