@@ -35,12 +35,18 @@ export default function RestaurantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newMenu, setNewMenu] = useState({ name: '', description: '' });
   const [qrValue, setQrValue] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editPreviewUrl, setEditPreviewUrl] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     fetchRestaurant();
@@ -54,9 +60,9 @@ export default function RestaurantDetailPage() {
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
       setRestaurant(data);
-      // if restaurant has an image field, use it
-      // (we're not persisting images to DB in this change; this will prefer imageUrl if present on data)
-      if ((data as any).imageUrl) setImageUrl((data as any).imageUrl);
+      // Prefer an explicit imageUrl on the restaurant response, or fallback to the first accessLink.qrCode (we store uploaded restaurant image there)
+      const possibleImage = (data as any).imageUrl || (data.accessLinks && data.accessLinks[0] && data.accessLinks[0].qrCode);
+      if (possibleImage) setImageUrl(possibleImage);
     } catch (error) {
       console.error('Error fetching restaurant:', error);
     } finally {
@@ -117,10 +123,22 @@ export default function RestaurantDetailPage() {
       });
       const body = await response.json();
       if (response.ok && body.url) {
+        // set local image immediately
         setImageUrl(body.url);
         setImageFile(null);
         setPreviewUrl(null);
-        // optionally refetch restaurant to pick up DB-saved image later
+        // persist image for this restaurant by calling PUT /api/restaurants/[id]
+        try {
+          await fetch(`/api/restaurants/${restaurantId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ imageUrl: body.url }),
+          });
+        } catch (e) {
+          console.error('Failed to persist restaurant image', e);
+        }
+        // refresh restaurant to pick up persisted image
         fetchRestaurant();
       } else {
         console.error('Upload failed', body);
@@ -165,13 +183,21 @@ export default function RestaurantDetailPage() {
               <p className="text-gray-600">{restaurant.location}</p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <input type="file" accept="image/*" onChange={handleFileChange} />
               <div className="flex gap-2">
-                <Button onClick={handleUpload} disabled={!previewUrl || uploading}>
-                  {uploading ? 'Uploading...' : 'Upload'}
+                <Button onClick={() => {
+                  // open edit modal pre-filled
+                  setEditName(restaurant.name);
+                  setEditLocation(restaurant.location);
+                  setEditPreviewUrl(imageUrl);
+                  setShowEditModal(true);
+                }}>
+                  Edit Restaurant
                 </Button>
-                <Button variant="outline" onClick={() => { setImageFile(null); setPreviewUrl(null); }}>
-                  Clear
+                <Button variant="secondary" onClick={() => {
+                  // quick action: open QR modal
+                  handleShowQR();
+                }}>
+                  Show QR Code
                 </Button>
               </div>
             </div>
@@ -284,6 +310,91 @@ export default function RestaurantDetailPage() {
             >
               Cancel
             </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Restaurant Modal */}
+      <Modal
+        isOpen={showEditModal}
+        title="Edit Restaurant"
+        onClose={() => setShowEditModal(false)}
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setSavingEdit(true);
+            try {
+              let finalImageUrl = editPreviewUrl || '';
+              if (editImageFile && editPreviewUrl) {
+                // upload first
+                const upRes = await fetch('/api/uploads', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ filename: editImageFile.name, data: editPreviewUrl }),
+                });
+                const upBody = await upRes.json();
+                if (upRes.ok && upBody.url) finalImageUrl = upBody.url;
+              }
+
+              await fetch(`/api/restaurants/${restaurantId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ name: editName, location: editLocation, imageUrl: finalImageUrl }),
+              });
+
+              setImageUrl(finalImageUrl || null);
+              setShowEditModal(false);
+              // refresh restaurant
+              fetchRestaurant();
+            } catch (err) {
+              console.error('Save edit failed', err);
+              alert('Failed to save');
+            } finally {
+              setSavingEdit(false);
+            }
+          }}
+          className="space-y-4"
+        >
+          <Input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+          <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} required />
+
+          <div>
+            <label className="block text-sm font-medium text-secondary mb-2">Restaurant Image</label>
+            <div className="flex items-center gap-4">
+              <div className="w-24 h-24 bg-gray-100 rounded overflow-hidden">
+                {editPreviewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={editPreviewUrl} alt="preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
+                )}
+              </div>
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setEditImageFile(f);
+                    if (!f) {
+                      setEditPreviewUrl(null);
+                      return;
+                    }
+                    const r = new FileReader();
+                    r.onload = () => setEditPreviewUrl(r.result as string);
+                    r.readAsDataURL(f);
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-2">Choose an image to upload and save to persist with the restaurant.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1" disabled={savingEdit}>{savingEdit ? 'Saving...' : 'Save'}</Button>
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancel</Button>
           </div>
         </form>
       </Modal>

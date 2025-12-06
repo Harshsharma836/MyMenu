@@ -6,6 +6,7 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/Card';
 import { Modal } from '@/components/Modal';
+import MenuModal from '@/components/MenuModal';
 
 interface Restaurant {
   id: string;
@@ -24,6 +25,8 @@ export default function DashboardPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [newRestaurant, setNewRestaurant] = useState({ name: '', location: '' });
 
   useEffect(() => {
@@ -114,6 +117,18 @@ export default function DashboardPage() {
                   <p className="text-sm text-gray-600">
                     <strong>Menus:</strong> {restaurant?.menus?.length}
                   </p>
+                  <div className="mt-2">
+                    <button
+                      className="text-primary text-sm font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRestaurantId(restaurant.id);
+                        setShowMenuModal(true);
+                      }}
+                    >
+                      View Menu
+                    </button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -159,6 +174,11 @@ export default function DashboardPage() {
           </div>
         </form>
       </Modal>
+      <MenuModal
+        isOpen={showMenuModal}
+        restaurantId={selectedRestaurantId}
+        onClose={() => setShowMenuModal(false)}
+      />
     </div>
   );
 }

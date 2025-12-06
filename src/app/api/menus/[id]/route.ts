@@ -3,7 +3,7 @@ import { prisma } from '@/server/db';
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const menu = await prisma.menu.findUnique({
       where: { id },
       include: {

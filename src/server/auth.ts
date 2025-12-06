@@ -34,8 +34,43 @@ export async function getAuthToken() {
   return token;
 }
 
-export async function getUserFromToken(token?: any) {
-  const tokenValue = token || (await getAuthToken());
+export async function getUserFromToken(tokenOrRequest?: any) {
+  // tokenOrRequest can be:
+  // - undefined -> read from server cookies() via getAuthToken()
+  // - a string token value
+  // - a NextRequest/Request object containing cookies or cookie header
+  let tokenValue: string | undefined | null = null;
+
+  if (typeof tokenOrRequest === 'string') {
+    tokenValue = tokenOrRequest;
+  } else if (tokenOrRequest && typeof tokenOrRequest === 'object') {
+    // Try to read cookies from NextRequest-like object
+    try {
+      const maybeCookies = (tokenOrRequest as any).cookies;
+      if (maybeCookies && typeof maybeCookies.get === 'function') {
+        const c = maybeCookies.get(TOKEN_NAME);
+        tokenValue = c?.value;
+      } else if (tokenOrRequest.headers && typeof tokenOrRequest.headers.get === 'function') {
+        const cookieHeader = tokenOrRequest.headers.get('cookie') || '';
+        const match = cookieHeader.split(';').map((s: string) => s.trim()).find((s: string) => s.startsWith(TOKEN_NAME + '='));
+        if (match) tokenValue = match.split('=')[1];
+      } else {
+        // Fall back to treating tokenOrRequest as token-like
+        tokenValue = (tokenOrRequest as any).toString?.() || null;
+      }
+    } catch (e) {
+      tokenValue = null;
+    }
+  } else {
+    tokenValue = await getAuthToken();
+  }
+
+  // Ensure tokenValue is a string; otherwise fallback to reading server cookies
+  if (typeof tokenValue !== 'string') {
+    // try server cookie fallback
+    tokenValue = await getAuthToken();
+  }
+
   if (!tokenValue) return null;
 
   const session = await prisma.session.findUnique({
