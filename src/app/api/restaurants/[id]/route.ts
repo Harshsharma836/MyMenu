@@ -64,7 +64,7 @@ export async function PUT(
       );
     }
 
-    const { name, location, imageUrl } = await request.json();
+    const { name, location, imageUrl, qrImageUrl } = await request.json();
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { id },
@@ -100,6 +100,23 @@ export async function PUT(
           }
         } catch (e) {
           console.error('Failed to persist restaurant image to access link', e);
+        }
+      }
+
+      // If a qrImageUrl was provided, store it as the qrCode field (or a separate field if schema is updated)
+      if (qrImageUrl) {
+        try {
+          const link = await prisma.restaurantAccessLink.findFirst({
+            where: { restaurantId: id },
+          });
+          if (link) {
+            await prisma.restaurantAccessLink.update({
+              where: { id: link.id },
+              data: { qrCode: qrImageUrl },
+            });
+          }
+        } catch (e) {
+          console.error('Failed to persist QR image URL', e);
         }
       }
     return NextResponse.json(updated);

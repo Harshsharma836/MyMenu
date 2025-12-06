@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import QRCode from 'qrcode';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import MenuModal from '@/components/MenuModal';
@@ -48,6 +49,7 @@ export default function RestaurantDetailPage() {
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editPreviewUrl, setEditPreviewUrl] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [generatedQRCode, setGeneratedQRCode] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRestaurant();
@@ -61,7 +63,6 @@ export default function RestaurantDetailPage() {
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
       setRestaurant(data);
-      // Prefer an explicit imageUrl on the restaurant response, or fallback to the first accessLink.qrCode (we store uploaded restaurant image there)
       const possibleImage = (data as any).imageUrl || (data.accessLinks && data.accessLinks[0] && data.accessLinks[0].qrCode);
       if (possibleImage) setImageUrl(possibleImage);
     } catch (error) {
@@ -93,10 +94,28 @@ export default function RestaurantDetailPage() {
     }
   };
 
-  const handleShowQR = () => {
+  const handleShowQR = async () => {
     if (restaurant?.accessLinks[0]) {
       const shareUrl = `${window.location.origin}/menu/${restaurant.accessLinks[0].shareToken}`;
       setQrValue(shareUrl);
+      try {
+        const qrDataUrl = await QRCode.toDataURL(shareUrl, {
+          errorCorrectionLevel: 'H',
+          type: 'image/png',
+          quality: 0.95,
+          margin: 2,
+          width: 300,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF',
+          },
+        });
+        setGeneratedQRCode(qrDataUrl);
+      } catch (err) {
+        console.error('Failed to generate QR code:', err);
+        alert('Failed to generate QR code');
+      }
+      
       setShowQRModal(true);
     }
   };
@@ -185,7 +204,6 @@ export default function RestaurantDetailPage() {
             <div className="flex flex-col items-end gap-2">
               <div className="flex gap-2">
                 <Button onClick={() => {
-                  // open edit modal pre-filled
                   setEditName(restaurant.name);
                   setEditLocation(restaurant.location);
                   setEditPreviewUrl(imageUrl);
@@ -194,7 +212,6 @@ export default function RestaurantDetailPage() {
                   Edit Restaurant
                 </Button>
                 <Button variant="secondary" onClick={() => {
-                  // quick action: open QR modal
                   handleShowQR();
                 }}>
                   Show QR Code
@@ -235,8 +252,7 @@ export default function RestaurantDetailPage() {
                 <div className="flex items-start gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-3 h-3 rounded-full bg-yellow-300 border-2 border-white shadow-sm" title="veg/veg-indicator" />
-                      <div className="text-lg font-semibold">₹ { (menu as any).price ?? '--' }</div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-300 border-2 border-white shadow-sm" />
                     </div>
                     <p className="text-sm text-gray-600 line-clamp-3">
                       {menu.description || 'No description available.'}
@@ -250,23 +266,12 @@ export default function RestaurantDetailPage() {
                       </button>
                     </div>
                   </div>
-
-                  <div className="w-24 h-24 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                    {/* placeholder thumb; if menu.imageUrl exists show it */}
-                    {(menu as any).imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={(menu as any).imageUrl} alt={menu.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
-                    )}
-                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Floating center Menu button (mobile style from screenshots) */}
         <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none">
           <div className="pointer-events-auto">
             <Button className="bg-primary text-white px-6 py-2 rounded-full shadow-lg" onClick={() => setShowMenuModal(true)}>
@@ -276,7 +281,6 @@ export default function RestaurantDetailPage() {
         </div>
       </div>
 
-      {/* Create Menu Modal */}
       <Modal
         isOpen={showMenuModal}
         title="Create Menu"
@@ -314,7 +318,6 @@ export default function RestaurantDetailPage() {
         </form>
       </Modal>
 
-      {/* Edit Restaurant Modal */}
       <Modal
         isOpen={showEditModal}
         title="Edit Restaurant"
@@ -327,7 +330,6 @@ export default function RestaurantDetailPage() {
             try {
               let finalImageUrl = editPreviewUrl || '';
               if (editImageFile && editPreviewUrl) {
-                // upload first
                 const upRes = await fetch('/api/uploads', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -346,7 +348,6 @@ export default function RestaurantDetailPage() {
 
               setImageUrl(finalImageUrl || null);
               setShowEditModal(false);
-              // refresh restaurant
               fetchRestaurant();
             } catch (err) {
               console.error('Save edit failed', err);
@@ -376,18 +377,18 @@ export default function RestaurantDetailPage() {
                   type="file"
                   accept="image/*"
                   onChange={(e) => {
-                    const f = e.target.files?.[0] || null;
-                    setEditImageFile(f);
-                    if (!f) {
+                    const file = e.target.files?.[0] || null;
+                    setEditImageFile(file);
+                    if (!file) {
                       setEditPreviewUrl(null);
                       return;
                     }
-                    const r = new FileReader();
-                    r.onload = () => setEditPreviewUrl(r.result as string);
-                    r.readAsDataURL(f);
+                    const reader = new FileReader();
+                    reader.onload = () => setEditPreviewUrl(reader.result as string);
+                    reader.readAsDataURL(file);
                   }}
                 />
-                <p className="text-xs text-gray-500 mt-2">Choose an image to upload and save to persist with the restaurant.</p>
+                <p className="text-xs text-gray-500 mt-2">Upload image to update restaurant</p>
               </div>
             </div>
           </div>
@@ -399,37 +400,63 @@ export default function RestaurantDetailPage() {
         </form>
       </Modal>
 
-      {/* QR Code Modal */}
       <Modal
         isOpen={showQRModal}
         title="Menu QR Code"
         onClose={() => setShowQRModal(false)}
       >
         <div className="flex flex-col items-center space-y-4">
-          <div className="bg-white p-4 rounded border-2 border-primary">
-            <p className="text-center font-bold text-primary text-2xl mb-2">QR</p>
-            <p className="text-center text-xs text-gray-600">Placeholder for QR Code</p>
+          <div className="w-48 h-48 bg-white rounded border-2 border-primary flex items-center justify-center">
+            {generatedQRCode ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={generatedQRCode} alt="Generated QR Code" className="w-full h-full object-contain" />
+            ) : (
+              <div className="text-center">
+                <p className="font-bold text-primary text-2xl">QR</p>
+              </div>
+            )}
           </div>
+
           <p className="text-sm text-gray-600 text-center">
             Customers can scan this QR code to view your menu
           </p>
-          <input
-            type="text"
-            value={qrValue}
-            readOnly
-            className="w-full px-3 py-2 border rounded text-sm"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              navigator.clipboard.writeText(qrValue);
-              alert('Link copied!');
-            }}
-          >
-            Copy Link
-          </Button>
+
+          <div className="w-full">
+            <label className="block text-sm font-medium text-secondary mb-2">Share Link</label>
+            <input
+              type="text"
+              value={qrValue}
+              readOnly
+              className="w-full px-3 py-2 border rounded text-sm"
+            />
+          </div>
+
+          <div className="flex gap-2 w-full">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                navigator.clipboard.writeText(qrValue);
+                alert('Link copied!');
+              }}
+            >
+              Copy Link
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={() => {
+                if (!generatedQRCode) return;
+                const link = document.createElement('a');
+                link.href = generatedQRCode;
+                link.download = `menu-qr-${restaurant?.name || 'qr'}.png`;
+                link.click();
+              }}
+            >
+              Download QR
+            </Button>
+          </div>
         </div>
       </Modal>
       <MenuModal isOpen={showMenuModal} restaurantId={restaurantId} onClose={() => setShowMenuModal(false)} />

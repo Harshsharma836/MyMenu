@@ -107,9 +107,8 @@ export const MenuModal: React.FC<Props> = ({ restaurantId, isOpen, onClose }) =>
                                 {(cat.dishes || []).map((dc) => {
                                   const dish = (dc as any).dish || dc;
                                   return (
-                                    <div key={dish.id} className="flex items-start justify-between">
-                                      <div className="text-sm text-gray-800">{dish.name}</div>
-                                      <div className="text-sm text-gray-500">{dish.price !== undefined ? `₹ ${dish.price}` : ''}</div>
+                                    <div key={dish.id} className="text-sm text-gray-800">
+                                      {dish.name}
                                     </div>
                                   );
                                 })}
