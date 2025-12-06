@@ -1,6 +1,7 @@
 [build]
   command = "npm run db:generate && npm run build"
   functions = ".netlify/functions"
+  publish = ""
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
