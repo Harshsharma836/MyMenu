@@ -36,6 +36,7 @@ export default function RestaurantDetailPage() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showCreateMenuModal, setShowCreateMenuModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [newMenu, setNewMenu] = useState({ name: '', description: '' });
@@ -87,7 +88,7 @@ export default function RestaurantDetailPage() {
 
       if (!response.ok) throw new Error('Failed to create');
       fetchRestaurant();
-      setShowMenuModal(false);
+      setShowCreateMenuModal(false);
       setNewMenu({ name: '', description: '' });
     } catch (error) {
       console.error('Error creating menu:', error);
@@ -227,7 +228,7 @@ export default function RestaurantDetailPage() {
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-xl font-bold">Menus</h2>
           <div className="flex gap-2">
-            <Button onClick={() => setShowMenuModal(true)}>
+            <Button onClick={() => setShowCreateMenuModal(true)}>
               Create Menu
             </Button>
             <Button variant="secondary" onClick={handleShowQR}>
@@ -282,9 +283,9 @@ export default function RestaurantDetailPage() {
       </div>
 
       <Modal
-        isOpen={showMenuModal}
+        isOpen={showCreateMenuModal}
         title="Create Menu"
-        onClose={() => setShowMenuModal(false)}
+        onClose={() => setShowCreateMenuModal(false)}
       >
         <form onSubmit={handleCreateMenu} className="space-y-4">
           <Input
@@ -310,7 +311,7 @@ export default function RestaurantDetailPage() {
               type="button"
               variant="outline"
               className="flex-1"
-              onClick={() => setShowMenuModal(false)}
+              onClick={() => setShowCreateMenuModal(false)}
             >
               Cancel
             </Button>
