@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
+import MenuModal from '@/components/MenuModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/Card';
 import { Modal } from '@/components/Modal';
 
@@ -124,7 +125,6 @@ export default function RestaurantDetailPage() {
       const body = await response.json();
       if (response.ok && body.url) {
         // set local image immediately
-        setImageUrl(body.url);
         setImageFile(null);
         setPreviewUrl(null);
         // persist image for this restaurant by calling PUT /api/restaurants/[id]
@@ -269,7 +269,7 @@ export default function RestaurantDetailPage() {
         {/* Floating center Menu button (mobile style from screenshots) */}
         <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none">
           <div className="pointer-events-auto">
-            <Button className="bg-primary text-white px-6 py-2 rounded-full shadow-lg">
+            <Button className="bg-primary text-white px-6 py-2 rounded-full shadow-lg" onClick={() => setShowMenuModal(true)}>
               ☰ Menu
             </Button>
           </div>
@@ -432,6 +432,7 @@ export default function RestaurantDetailPage() {
           </Button>
         </div>
       </Modal>
+      <MenuModal isOpen={showMenuModal} restaurantId={restaurantId} onClose={() => setShowMenuModal(false)} />
     </div>
   );
 }

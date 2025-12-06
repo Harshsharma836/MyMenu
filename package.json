@@ -26,6 +26,8 @@
     "qrcode": "^1.5.3",
     "nodemailer": "^6.9.13",
     "@types/nodemailer": "^6.4.14"
+    ,"@aws-sdk/client-s3": "^4.0.0"
+    ,"cloudinary": "^1.32.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
