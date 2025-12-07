@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     }
 
     if (!buffer) return NextResponse.json({ error: 'No file buffer' }, { status: 400 });
+    if (!filename) return NextResponse.json({ error: 'No filename' }, { status: 400 });
 
     // sanitize and prefix filename for uniqueness
     const baseSafe = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
