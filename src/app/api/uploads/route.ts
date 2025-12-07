@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     if (!filename) return NextResponse.json({ error: 'No filename' }, { status: 400 });
 
     // sanitize and prefix filename for uniqueness
-    const baseSafe = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+const baseSafe = path.basename(filename || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
     const unique = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString('hex');
     const safeName = `${unique}_${baseSafe}`;
 
