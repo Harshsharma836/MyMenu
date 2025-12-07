@@ -5,40 +5,61 @@ import { uploadBuffer } from '@/server/storage';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { filename, data } = body;
-    if (!filename || !data) {
-      return NextResponse.json({ error: 'Missing filename or data' }, { status: 400 });
+    const contentTypeHeader = request.headers.get('content-type') || '';
+
+    let filename: string | undefined;
+    let buffer: Buffer | undefined;
+    let mime: string | undefined;
+
+    if (contentTypeHeader.includes('multipart/form-data')) {
+      // Handle form uploads (preferred for large files / deployment)
+      const form = await request.formData();
+      const file = form.get('file') as File | null;
+      if (!file) {
+        return NextResponse.json({ error: 'Missing file in form data' }, { status: 400 });
+      }
+      filename = (file as any).name || 'upload';
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      mime = (file as any).type || undefined;
+    } else {
+      // Fallback: accept JSON body with base64 data (legacy)
+      const body = await request.json();
+      filename = body.filename;
+      const data = body.data;
+      if (!filename || !data) {
+        return NextResponse.json({ error: 'Missing filename or data' }, { status: 400 });
+      }
+
+      const base = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const commaIdx = data.indexOf(',');
+      let base64 = data;
+      if (commaIdx !== -1) {
+        const meta = data.slice(0, commaIdx);
+        base64 = data.slice(commaIdx + 1);
+        const match = meta.match(/data:([^;]+);base64/);
+        if (match) mime = match[1];
+      }
+      buffer = Buffer.from(base64, 'base64');
+      // for JSON mode we will still add a unique prefix below
+      filename = base;
     }
 
-    // sanitize base filename and prefix with a UUID for uniqueness
-    const base = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!buffer) return NextResponse.json({ error: 'No file buffer' }, { status: 400 });
+
+    // sanitize and prefix filename for uniqueness
+    const baseSafe = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
     const unique = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString('hex');
-    const safeName = `${unique}_${base}`;
+    const safeName = `${unique}_${baseSafe}`;
 
-    // data expected as data:<mime>;base64,<payload> or raw base64
-    let base64 = data;
-    let contentType: string | undefined = undefined;
-    const commaIdx = data.indexOf(',');
-    if (commaIdx !== -1) {
-      const meta = data.slice(0, commaIdx);
-      base64 = data.slice(commaIdx + 1);
-      const match = meta.match(/data:([^;]+);base64/);
-      if (match) contentType = match[1];
-    }
-
-    const buffer = Buffer.from(base64, 'base64');
-
-    // upload using storage helper (Cloudinary or local)
     try {
-      const res = await uploadBuffer(safeName, buffer, contentType);
+      const res = await uploadBuffer(safeName, buffer, mime);
       return NextResponse.json({ url: res.url });
     } catch (e) {
       console.error('Storage upload failed', e);
       return NextResponse.json({ error: 'Failed to store upload' }, { status: 500 });
     }
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('Upload error', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }

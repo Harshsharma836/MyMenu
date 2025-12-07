@@ -43,14 +43,29 @@ export async function uploadBuffer(filename: string, buffer: Buffer, contentType
     // set public_id to the base name under the folder (Cloudinary will ensure uniqueness if configured)
     opts.public_id = baseName;
 
-    const result = await new Promise<any>((resolve, reject) => {
-      cloudinary.uploader.upload(dataUri, opts, (error, res) => {
-        if (error) return reject(error);
-        resolve(res);
+    try {
+      const result = await new Promise<any>((resolve, reject) => {
+        cloudinary.uploader.upload(dataUri, opts, (error, res) => {
+          if (error) return reject(error);
+          resolve(res);
+        });
       });
-    });
 
-    return { url: result.secure_url, key: result.public_id };
+      return { url: result.secure_url, key: result.public_id };
+    } catch (err: any) {
+      // Improve the error message when Cloudinary returns a signature/auth error
+      const msg = String(err?.message || err);
+      if (msg.includes('Invalid Signature') || err?.http_code === 401) {
+        throw new Error(
+          `Cloudinary upload failed: Invalid signature (HTTP 401). ` +
+            `This usually means your CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET are incorrect or misconfigured. ` +
+            `Check your .env and hosting platform secrets. Original error: ${msg}`
+        );
+      }
+
+      // Re-throw original error for other cases
+      throw err;
+    }
   }
 
   // Local fallback: write into public/uploads
