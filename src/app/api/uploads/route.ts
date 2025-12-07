@@ -48,11 +48,10 @@ export async function POST(request: Request) {
     if (!buffer) return NextResponse.json({ error: 'No file buffer' }, { status: 400 });
     if (!filename) return NextResponse.json({ error: 'No filename' }, { status: 400 });
 
-    // sanitize and prefix filename for uniqueness
-const baseSafe = path.basename(filename || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const unique = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString('hex');
-    const safeName = `${unique}_${baseSafe}`;
-
+  const safeFilename: string = filename ?? 'upload';
+const baseSafe = path.basename(safeFilename).replace(/[^a-zA-Z0-9._-]/g, '_');
+const unique = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString('hex');
+const safeName = `${unique}_${baseSafe}`;
     try {
       const res = await uploadBuffer(safeName, buffer, mime);
       return NextResponse.json({ url: res.url });
